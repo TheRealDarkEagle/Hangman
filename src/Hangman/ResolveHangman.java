@@ -17,13 +17,13 @@ public class ResolveHangman {
 	 * 
 	 * Kommentare einfügen, wenn mehrere Operation in einer Methode ausgeführt werden, und erklären was gerade passiert
 	 * 
-	 * beziehungen zwischen den buchstaben einf�gen
+	 * beziehungen zwischen den buchstaben einfügen
 	 * teste zweiten bis vorletzten buchstabe
 	 * schaue davor und danach welche buchstaben dastehen
-	 * speichere m�gliche variation in datei 
+	 * speichere mögliche variation in datei 
 	 * wenn kein wort mehr in liste ist 
-	 * gehe auf diese datei zur�ck 
-	 * und schaue nach welche buchstaben man als besten f�r die leeren felder einsetzen k�nnte
+	 * gehe auf diese datei zurück 
+	 * und schaue nach welche buchstaben man als besten  für die leeren felder einsetzen könnte
 	 * 
 	 * z.b. Apf_ltasch_ wie oft kam bisher ein buchstabe nach einem f 
 	 * wie oft kam bisher ein buchstabe nach einem h 
@@ -35,13 +35,15 @@ public class ResolveHangman {
 	 */
 	
 	private String potencialChars = "abcdefghijklmnopqrstuvwxyzäöüß";
-	private int[] countChars= new int[potencialChars.length()];
+	private int[] countChars = new int[potencialChars.length()];
 	private char[] amountOfCharsInWords = potencialChars.toCharArray();
-	boolean checkedForLength = false; 
 	private ArrayList<Character> usedChars = new ArrayList<Character>();
 	private ArrayList<String> wordList;
 	
-	
+	/**
+	 * Konstruktor
+	 * @throws IOException
+	 */
 	public ResolveHangman() throws IOException {
 		this.wordList = this.loadWordsFromFile();
 	}
@@ -53,7 +55,7 @@ public class ResolveHangman {
 	 * @throws FileNotFoundException
 	 * @throws IOException
 	 */
-	private static ArrayList<String> splitWordsFromList(StringBuilder sb) throws FileNotFoundException, IOException {
+	private ArrayList<String> splitWordsFromList(StringBuilder sb) throws FileNotFoundException, IOException {
 		ArrayList<String> alSpli = new ArrayList<String>();
 		int start = 0;
 		int ende = 0;
@@ -100,7 +102,7 @@ public class ResolveHangman {
 	}
 	
 	/**
-	 * Findet den naechsten Buchstaben anhand aller Bekannten W�rter 
+	 * Findet den naechsten Buchstaben anhand aller Bekannten Wörter 
 	 * @param theWord
 	 * @return
 	 */
@@ -114,9 +116,13 @@ public class ResolveHangman {
 			testTheChar(theWord);
 		}
 		System.out.println(wordList);
+		if(wordList.isEmpty()) {
+			//return getCharByPossibility(theWord);
+		}
 		return getCharToUse(amountOfCharsInWords);
 	}
 	
+
 	/**
 	 * Prüfe ob zuletzt benutzter Buchstabe im Wort vorhanden war
 	 * @param theWord
@@ -159,7 +165,6 @@ public class ResolveHangman {
 			}
 		}
 	}
-	
 
 	/**
 	 * Setzt alle Felder das Array countChars auf 0
@@ -171,7 +176,7 @@ public class ResolveHangman {
 	}
 	
 	/**
-	 * Sucht aus der Liste alle w�rter mit der L�nge  des gesuchten Wortes heraus und l�scht die restlichen 
+	 * Sucht aus der Liste alle Wörter mit der Länge des gesuchten Wortes heraus und löscht die restlichen 
 	 * @param lengthFromWord
 	 * @param list
 	 */
@@ -222,7 +227,6 @@ public class ResolveHangman {
 		sortArrays(countChars,amountOfCharsInWords);
 	}
 	
-	
 	/**
 	 * Sucht anhand der Menge der Buchstaben in den Potentiellen W�rtern den h�ufigsten, noch nicht benutzten, Buchstaben heraus 
 	 * @return char 
@@ -241,7 +245,7 @@ public class ResolveHangman {
 	}
 	
 	/**
-	 * Z�hlt alle Buchstaben durch die in der Liste vorhanden sind 
+	 * Zählt alle Buchstaben durch die in der Liste vorhanden sind 
 	 * @param countChars
 	 * @param allChars
 	 */
@@ -288,6 +292,56 @@ public class ResolveHangman {
 					char tempChar = allChars[a];
 					allChars[a] = allChars[a-1];
 					allChars[a-1] = tempChar;
+					
+				}
+			}
+		}
+	}
+
+	/**
+	 * Wenn Wortliste leer - finde nächsten besten Buchstaben heraus anhand von Buchstabenzusammenhang 
+	 * @throws IOException 
+	 * @TODO:
+	 * Länge des gesuchten Wortes heraufinden
+	 * Liste bearbeiten und nur die Wörter lassen mit der Länge des Wortes
+	 * Zusammenhänge zwischen den buchstaben herausfinden 
+	 * 
+	 */
+	private char getCharByPossibility(char[] theWord) throws IOException {
+		//allWorts hält eine Liste mit allen Wörtern aus Textdatei
+		ArrayList<String> allWords = loadWordsFromFile();
+		//Sortiert alle einträge aus der Liste, welche nicht die entpsrechende Länge des Wortes haben 
+		sortFromLength(theWord.length, allWords);
+		charConnection(allWords);
+		return 0;
+	}
+	
+	/**
+	 * buchstabe nach buchstabe 
+	 * nehme position I 
+	 * nehme buchstabe position I-1,I -> ha
+ 	 * speichere wie oft buchstabe I in verbindung mit buchstabe I-1 vorkommt
+ 	 * -> jeder buchstabe hat 26 verschiedene möglichkeiten -> es gibt 26 buchstaben = [26][26] array
+ 	 * speichere in int array die anzahl der häufigkeit des vorkommenden buchstaben bei dem jeweiligen buchstaben -> [h][a][10] -> [grundbuchstabe][afterGrundbuchstabe][häufigkeit] 
+ 	 * speichere diese Werte in eine Datei 
+	 * @param allWords
+	 */
+	//Durchsucht die bearbeitet Liste nach dem Zusammenhang der Buchstaben (zweiter bis vorletzter)
+	private void charConnection(ArrayList<String> allWords) {
+		//Nimmt das Wort aus liste und schaut stelle 1 bis vorletzte an 
+		for(String word:allWords) {
+			for(int i = 0;i<word.length()-1;i++) {
+				String getConnectionBetweenChars = word.substring(i, i+1);
+				for(int a = 0;a<2;a++);{
+					//hallo wird zu ha
+					//speichere das in einer map (key) 
+					//value = 1
+					//jedes mal wenn ich diesen string sehe erhöhe value++
+					//wenn er nicht vorhanden ist 
+					//füge diese verbindung von buchstaben hinzu und setze value auf 1 
+					//um die map zu erstellen benötige ich 1 array und zwei schleifen die verschachtelt sind und durch das selbe array iterieren 
+					// -> a,b,c,d, etc -> key: aa,ab,ac,ad,ae,af -> za,zb,zc,zd 
+					//map größe = 26*26 da 26 buchstaben 26 verschiedene möglichkeiten für eine verbindung haben 
 					
 				}
 			}
