@@ -4,8 +4,14 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
+import java.lang.Character.Subset;
+import java.security.acl.LastOwnerException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Map;
+
+import org.w3c.dom.css.Counter;
 
 public class ResolveHangman {
 	
@@ -34,11 +40,9 @@ public class ResolveHangman {
 	 * Wenn der buchstabe öfter als 1x vorkommt - teste die restlichen stellen auch -> führt zu einer besseren Genauigkeit der Wörterauswahl 
 	 */
 	
-	private String potencialChars = "abcdefghijklmnopqrstuvwxyzäöüß";
-	private int[] countChars = new int[potencialChars.length()];
-	private char[] amountOfCharsInWords = potencialChars.toCharArray();
 	private ArrayList<Character> usedChars = new ArrayList<Character>();
 	private ArrayList<String> wordList;
+	private Map<Character, Integer> map;
 	
 	/**
 	 * Konstruktor
@@ -46,8 +50,34 @@ public class ResolveHangman {
 	 */
 	public ResolveHangman() throws IOException {
 		this.wordList = this.loadWordsFromFile();
+		this.map = new HashMap<Character,Integer>();
 	}
 	
+	/**
+	 * Findet den naechsten Buchstaben anhand aller Bekannten Wörter 
+	 * @param theWord
+	 * @return
+	 */
+	public char getChar(char[] theWord) {
+		Character bestChar = null;
+		//Wenn usedChars == empty -> remove alle Einträge mit anderer Länge aus wordList
+		if(usedChars.isEmpty()){
+			sortFromLength(theWord.length,wordList);
+			bestChar =  getBestChar(theWord);
+		}else{
+			testTheChar(theWord);
+			if(!wordList.isEmpty()) {
+				bestChar =  getBestChar(theWord);
+			}else{
+				bestChar = getCharByPossibility(theWord);
+			}
+		}
+		usedChars.add(bestChar);
+		return bestChar;
+	}
+	
+	
+
 	/**
 	 * Trennt die Listenwörter voneinander und speichert sie in liste ab
 	 * @param sb
@@ -87,7 +117,7 @@ public class ResolveHangman {
 	 * @return
 	 * @throws IOException
 	 */
-	private ArrayList<String> loadWordsFromFile() throws IOException {
+	private ArrayList<String> loadWordsFromFile() {
 		try(InputStream is = new FileInputStream("D:\\Danz Kai Adrian empiriecom\\Hangman\\wortsammlung.txt")){
 			byte[] buffer = new byte[1024];
 			StringBuilder sb = new StringBuilder();
@@ -98,29 +128,18 @@ public class ResolveHangman {
 				bytesRead = is.read(buffer);
 			}
 		return (splitWordsFromList(sb));
+		} catch (FileNotFoundException e) {
+			System.out.println("File wurde nicht gefunden!");
+			e.printStackTrace();
+			return null;
+		} catch (IOException e) {
+			System.out.println("Es ist ein Fehler aufgetreten...");
+			e.printStackTrace();
+			return null;
 		}
 	}
 	
-	/**
-	 * Findet den naechsten Buchstaben anhand aller Bekannten Wörter 
-	 * @param theWord
-	 * @return
-	 */
-	public char getChar(char[] theWord) {
-		//Wenn usedChars == empty -> remove alle Einträge mit anderer Länge aus wordList
-		if(usedChars.isEmpty()) {
-			sortFromLength(theWord.length,wordList);
-			return getCharToUse(amountOfCharsInWords);
-		}else{
-			countAndSort();
-			testTheChar(theWord);
-		}
-		System.out.println(wordList);
-		if(wordList.isEmpty()) {
-			//return getCharByPossibility(theWord);
-		}
-		return getCharToUse(amountOfCharsInWords);
-	}
+	
 	
 
 	/**
@@ -128,7 +147,7 @@ public class ResolveHangman {
 	 * @param theWord
 	 */
 	private void testTheChar(char[] theWord) {
-		Character lastUsed = usedChars.get(0);
+		Character lastUsed = usedChars.get(usedChars.size()-1);
 		StringBuilder arrayIntoString = new StringBuilder();
 		//Wenn letzter benutzter Buchstabe gleich  index 0 von theWord in groß ist groß ist 
 		if(theWord[0]==Character.toUpperCase(lastUsed)) {
@@ -166,32 +185,34 @@ public class ResolveHangman {
 		}
 	}
 
-	/**
-	 * Setzt alle Felder das Array countChars auf 0
-	 */
-	private void resetCounterFromcountCharacter() {
-		for (int i = 0; i < countChars.length; i++) {
-			countChars[i] = 0;
-		}
-	}
 	
 	/**
 	 * Sucht aus der Liste alle Wörter mit der Länge des gesuchten Wortes heraus und löscht die restlichen 
 	 * @param lengthFromWord
 	 * @param list
 	 */
-	private void sortFromLength(int lengthFromWord, ArrayList<String> list) {
-		for (int i = 0; i < wordList.size(); i++) {
-			int lengthWordInListe = wordList.get(i).length();
+	private ArrayList<String> sortFromLength(int lengthFromWord, ArrayList<String> list) {
+		for (int i = 0; i < list.size(); i++) {
+			int lengthWordInListe = list.get(i).length();
 			if(lengthWordInListe!=lengthFromWord) {
-				wordList.remove(i);
+				list.remove(i);
 				i--;
 			}
 		}
-		wordList.trimToSize();
-		countAndSort();
+		toSmall();
+		list.trimToSize();
+		return list;
 	}
 	
+	private void toSmall() {
+		ArrayList<String> copyOfWordList = new ArrayList<String>();
+		for(String s:wordList) {
+			copyOfWordList.add(s);
+			
+		}
+		wordList = copyOfWordList;
+	}
+
 	/**
 	 * Löscht alle Einträge der Liste, indenen der Buchstabe nicht an der selben Stelle vorhanden ist (ausgehend von dem ersten erscheinen des Buchstaben in theWord)
 	 * @param charExist
@@ -199,15 +220,13 @@ public class ResolveHangman {
 	 */
 	//Prüfe solange bis am letzten buchstaben angekommen 
 	private void charExist(Character charExist,char[] theWord) {
-		int indexOfChar=0;
 		//Finde stelle des Buchstaben in theWord heraus
 		for(int i =0;i<theWord.length;i++) {
 			Character theWordCharAtIndex = theWord[i];
 			if(theWordCharAtIndex==charExist) {
-				indexOfChar = i;
 				//teste ob eingesetzte stelle des buchstaben gleich der stelle im wort von wordList ist 
 				for(int a=0;a<wordList.size();a++) {
-					if(wordList.get(a).charAt(indexOfChar)!=charExist) {
+					if(wordList.get(a).charAt(i)!=charExist) {
 						wordList.remove(a);
 						a--;
 					}
@@ -215,136 +234,211 @@ public class ResolveHangman {
 			}
 		}
 		wordList.trimToSize();
-		countAndSort();
 	}
 		
-	/**
-	 * aufrufen der Methoden: resetCounterFromDigitList,countCharacter,sortArrays
-	 */
-	private void countAndSort() {
-		resetCounterFromcountCharacter();
-		countCharacter(countChars,amountOfCharsInWords);
-		sortArrays(countChars,amountOfCharsInWords);
+	//sucht höchsten wert aus map 
+	private int getMaxValue() {
+		int max=-1;
+		for(Map.Entry<Character, Integer> m : map.entrySet()) {
+			if(max<m.getValue()) {
+				max = m.getValue();
+			}
+		}
+		return max;
+	}
+
+	//zählt jeden Buchstaben in Wort-Liste
+	private void countAllChars(ArrayList<String> list) {
+		map.clear();
+		for(String word:list) {
+			for(int a=0;a<word.length();a++) {
+				word = word.toLowerCase();
+				char thisChar = word.charAt(a);
+				if(map.containsKey(thisChar)) {
+					map.put(thisChar, map.get(thisChar)+1);
+				}else {
+					map.put(word.charAt(a), 1);
+				}
+			}
+		}
 	}
 	
-	/**
-	 * Sucht anhand der Menge der Buchstaben in den Potentiellen W�rtern den h�ufigsten, noch nicht benutzten, Buchstaben heraus 
-	 * @return char 
-	 */
-	private char getCharToUse(char[] amountOfCharsInAllWords) {
-		int lastCharInArrayChars = amountOfCharsInAllWords.length-1;
-		Character bestChar = amountOfCharsInAllWords[lastCharInArrayChars];
-		String alreadyUsed = usedChars.toString();
-		//solange buchstabe schon benutzt wurde -> teste nachfolgenden Buchstaben
-		while(alreadyUsed.contains(bestChar.toString())){
-			lastCharInArrayChars--;
-			bestChar = amountOfCharsInAllWords[lastCharInArrayChars];
-		}
-		this.usedChars.add(0, bestChar);
+	
+	private char getBestChar(char[] theWord) {
+		countAllChars(wordList);
+		char bestChar  = getBestCharFromList();
 		return bestChar;
 	}
 	
 	/**
-	 * Zählt alle Buchstaben durch die in der Liste vorhanden sind 
-	 * @param countChars
-	 * @param allChars
+	 * @TODO
+	 * FEHLER!!!
+	 * 
+	 * wenn true funkttioniert noch nicht richtig -> oder die positionsabfrage klappt noch nicht genau ... wer weiß das denn schon so genau >.< AAASDHALSKDHALKSDHALSD
+	 * @param list
+	 * @param indexOfThisChar
+	 * @param searchAfterChar
+	 * @param theWord
 	 */
-	private void countCharacter(int[] countChars,char[] allChars) {
-		String allWords = mergeWordList().toLowerCase();
-		for(int i=0;i<allWords.length();i++) {
-			for(int x=0;x<allChars.length;x++) {
-				if(allChars[x]==allWords.charAt(i)) {
-					countChars[x]++;
+	//durchsucht wort nach vorhandenem buchstaben -> zählt den buchstaben davor/danach 
+	private void countNextChar(ArrayList<String> list,int indexOfThisChar,boolean searchAfterChar,char[] theWord) {
+		map.clear();
+		//möchte den eigentlichen Buchstaben NACH DEM buchstaben finden 
+		if(searchAfterChar) {
+			String thisChar = ""+theWord[indexOfThisChar-1];
+			for(String w: list) {
+				//Wenn substring 0-länge-1 den buchstaben enthält
+				if(w.substring(0, w.length()-2).contains(thisChar.toLowerCase())) {
+					//gehe durch wort durch 
+					for(int i = w.length()-2;i>-1;i--) {
+						//wenn buchstabe gleich zu suchenenden buchstabe ist
+						if(w.charAt(i)==thisChar.charAt(0)) {
+							//nehme buchstabe aus wort, welcher davor steht 
+							char nextChar = w.charAt(i+1);
+							//speichere buchstabe in map ab 
+							if(map.containsKey(nextChar)) {
+								map.put(nextChar, map.get(nextChar)+1);
+							}else {
+								map.put(nextChar, 1);
+							}
+						}
+					}
+				}
+			}
+			//möchte eigentlichen Buchstaben VOR DEM buchstaben finden 
+		}else {
+			for(String w:list) {
+				//nehme zu vergleichenden buchstaben aus wort 
+				char thisChar = theWord[indexOfThisChar+1];
+				//wenn substring von 1 - ende von w den buchstaben besitzt 
+				if(w.substring(1, w.length()).contains(""+thisChar)) {
+					//gehe wort durch 
+					for(int i = 1;i<w.length()-1;i++) {
+						//wenn buchstabe aus wort gleich dem gesuchten buchstaben ist  
+						if(w.charAt(i)==thisChar) {
+							//nehme buchstabe vor dem eigentlichen buchstaben 
+							char beforeChar = w.charAt(i-1);
+							//mache den buchstaben klein 
+							String toMakeItLowerCase = ""+beforeChar;
+							
+							beforeChar = toMakeItLowerCase.toLowerCase().charAt(0);
+							//hochzählung des buchstaben 
+							if(map.containsKey(beforeChar)) {
+								map.put(beforeChar, map.get(beforeChar)+1);
+							}else {
+								map.put(beforeChar, 1);
+							}
+						}
+					}
 				}
 			}
 		}
 	}
 	
-	/**
-	 * Setzt alle wörter zu einem ganzen String zusammen
-	 * @return
-	 */
-	private String mergeWordList() {
-		int sizeOfList = wordList.size();
-		StringBuilder sb = new StringBuilder(); 
-		for(int a=0;a<sizeOfList;a++) {
-			sb = sb.append(wordList.get(a));
-		}
-		String allWords = sb.toString();
-		return allWords;
-	}
-	
-	/**
-	 * Sortiert countChars und allChars array nach h�ufigkeit hoechster zahl von CountChars (Via BubbleSort)
-	 * @param countChars
-	 * @param allChars
-	 */
-	private void sortArrays(int[] countChars, char[] allChars) {
-		for(int o=0;o<allChars.length;o++) {
-			for(int a=1;a<allChars.length;a++) {
-				// wemm die Anzahl der vorkommenden Wörter unterschiedlich ist, dann tausche:
-				if(countChars[a-1]>countChars[a]) {
-					// die Anzahl miteinander
-					int tempZahl = countChars[a];
-					countChars[a] = countChars[a-1];
-					countChars[a-1] = tempZahl;
-					// die Buchstaben miteinander
-					char tempChar = allChars[a];
-					allChars[a] = allChars[a-1];
-					allChars[a-1] = tempChar;
-					
-				}
+	//geht durch die bisher gefundenen Buchstaben und gibt den zuletzt gefundenen Buchstaben zurück 
+	private int getCharToSearch(char[] theWord) {
+		int counter = 0;
+		//Der buchstabe vor dem eigentlichen buchstabe muss ein '.' sein !!!
+		//solange an stelle counter von theWord ein punkt ist UND links ODER rechts daneben kein punkt ist 
+		for(int i = theWord.length-2;i>=1;i--) {
+			if(theWord[i]=='.'&&(theWord[i-1]!='.'||theWord[i+1]!='.')&&!usedChars.contains(theWord[i])){
+				counter = i; 
 			}
 		}
+		return counter;
 	}
+	
+	//Prüft ob nach dem gefunden buchstaben ein Buchstabe ist
+	private boolean isCharAfterChar(char[] theWord, int indexChar) {
+		//überarbeiten 
+		/**
+		 * Hier die prüfung? 
+		 * 
+		 * was habe ich an diesem punkt? die stelle wo ein . ist 
+		 * was möchte ich nun wissen? ob ich den buchstaben vor diesem suche oder den buchstaben danach
+		 * 
+		 * hier gebe ich an ob ich vor dem buchstaben oder danach suchen soll 
+		 * die eigentliche prüfung sollte sein an welcher stelle mein buchstabe noch da ist und den buchstaben der davor steht suche ich 
+		 * oder den buchstaben der danach kommt
+		 * also brauche ich 2 verscheidene methoden , welche mir dementsprechend die buchstaben herausfinden
+		 * momentan bekomme ich hier "nur" zurück ob ich vor oder nach dem eigentlichen buchstaben suchen soll 
+		 */
+//		String allChars = "abcdefghijklmnopqrstuvwxyzäöüß";
+		//solange stelle x . UND davor kein punkt
+		if(indexChar==0) {
+			return false;
+		}else if(indexChar==theWord.length-1) {
+			return true;
+		}else {
+			if(theWord[indexChar-1]!='.') {
+				return true;
+			}else {
+				return false;
+			}
+		}
+		
+//		if(indexChar+1!=theWord.length-1) {
+//			if(allChars.contains(""+theWord[indexChar])) {
+//				return true;
+//			}
+//		}
+//		return false;
+	}
+	
+	//Gibt die vorkommenenden Buchstaben in BuchstabenListe nach vorkommen 
+	private char getBestCharFromList() {
+		ArrayList<Character> sortedChars = new ArrayList<Character>();
+		int max = getMaxValue();
+		do {
+			for(Map.Entry<Character, Integer> entry : map.entrySet()) {
+				if(entry.getValue()==max) {
+					if(!usedChars.contains(entry.getKey()))
+					sortedChars.add(entry.getKey());
+				}
+			}
+		max--;
+		}while(max>0);
+		for(int i = 0;i<sortedChars.size();i++) {
+			if(!usedChars.contains(sortedChars.get(i))){
+				return sortedChars.get(i);
+			}
+		}
+		return 'a';
+	}
+	
+//---------------------------------------------------------------- HIERAN WIRD NOCH GEARBEITET!!! ---------------------------------------------------------------------
+	
+	
+	
 
 	/**
+	 * 
+	 * @TODO: Überarbeitungswürdig... -> eher methoden komplett neu schreiben! 
+	 * 
+	 * einstieg wenn keine wörter mehr vorhanden 
+	 * durchsuche nach zuletzt passendem buchstabe 
+	 * durchsuche wortliste nach diesem buchstaben 
+	 * zähle vorkommen der buchstaben davor/danach welche noch nicht probiert wurden 
+	 * probiere besten buchstaben 
+	 * 
 	 * Wenn Wortliste leer - finde nächsten besten Buchstaben heraus anhand von Buchstabenzusammenhang 
 	 * @throws IOException 
-	 * @TODO:
-	 * Länge des gesuchten Wortes heraufinden
-	 * Liste bearbeiten und nur die Wörter lassen mit der Länge des Wortes
-	 * Zusammenhänge zwischen den buchstaben herausfinden 
 	 * 
 	 */
-	private char getCharByPossibility(char[] theWord) throws IOException {
+	private char getCharByPossibility(char[] theWord) {
 		//allWorts hält eine Liste mit allen Wörtern aus Textdatei
 		ArrayList<String> allWords = loadWordsFromFile();
 		//Sortiert alle einträge aus der Liste, welche nicht die entpsrechende Länge des Wortes haben 
-		sortFromLength(theWord.length, allWords);
-		charConnection(allWords);
-		return 0;
-	}
-	
-	/**
-	 * buchstabe nach buchstabe 
-	 * nehme position I 
-	 * nehme buchstabe position I-1,I -> ha
- 	 * speichere wie oft buchstabe I in verbindung mit buchstabe I-1 vorkommt
- 	 * -> jeder buchstabe hat 26 verschiedene möglichkeiten -> es gibt 26 buchstaben = [26][26] array
- 	 * speichere in int array die anzahl der häufigkeit des vorkommenden buchstaben bei dem jeweiligen buchstaben -> [h][a][10] -> [grundbuchstabe][afterGrundbuchstabe][häufigkeit] 
- 	 * speichere diese Werte in eine Datei 
-	 * @param allWords
-	 */
-	//Durchsucht die bearbeitet Liste nach dem Zusammenhang der Buchstaben (zweiter bis vorletzter)
-	private void charConnection(ArrayList<String> allWords) {
-		//Nimmt das Wort aus liste und schaut stelle 1 bis vorletzte an 
-		for(String word:allWords) {
-			for(int i = 0;i<word.length()-1;i++) {
-				String getConnectionBetweenChars = word.substring(i, i+1);
-				for(int a = 0;a<2;a++);{
-					//hallo wird zu ha
-					//speichere das in einer map (key) 
-					//value = 1
-					//jedes mal wenn ich diesen string sehe erhöhe value++
-					//wenn er nicht vorhanden ist 
-					//füge diese verbindung von buchstaben hinzu und setze value auf 1 
-					//um die map zu erstellen benötige ich 1 array und zwei schleifen die verschachtelt sind und durch das selbe array iterieren 
-					// -> a,b,c,d, etc -> key: aa,ab,ac,ad,ae,af -> za,zb,zc,zd 
-					//map größe = 26*26 da 26 buchstaben 26 verschiedene möglichkeiten für eine verbindung haben 
-					
-				}
-			}
+		ArrayList<String> newWordList = sortFromLength(theWord.length, allWords);
+		int searchFromChar = getCharToSearch(theWord);
+		//prüfe ob vor oder nach dem buchstaben gesucht werden soll 
+		//überarbeite die prüfung welcher buchstabe getestet werden soll 
+		if(isCharAfterChar(theWord, searchFromChar)) {
+			countNextChar(newWordList, searchFromChar, true, theWord);
+		}else {
+			countNextChar(newWordList, searchFromChar, false, theWord);
 		}
+		char bestChar = getBestCharFromList();
+		return bestChar;
 	}
 }
